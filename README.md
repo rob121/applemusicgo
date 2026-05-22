@@ -1,6 +1,6 @@
 # applemusicgo
 
-Go reimplementation of an Apple Music HTTP/CLI controller for macOS. It drives **Music.app** (or iTunes) through **osascript** (JXA and AppleScript), matching the API of the reference Node.js `app.js` in `todo.md`.
+Go reimplementation of the Apple Music HTTP/CLI server for macOS. It drives **Music.app** (or iTunes) through **osascript** (JXA and AppleScript) and implements the same REST API as [apple-music-custom](https://github.com/Hackashaq666/apple-music-custom), with added catalog search and Apple Music subscription playback.
 
 ## Requirements
 
@@ -93,6 +93,12 @@ If Music shows **“There was a problem downloading … (3048)”** when playing
 - `internal/server` — HTTP API and Swagger UI
 - `api/` — embedded OpenAPI spec
 - `lib/` — reference AppleScript only (not used at runtime; see `lib/README.md`)
+
+## Credits
+
+This project is a Go port of the macOS REST API used by **[apple-music-custom](https://github.com/Hackashaq666/apple-music-custom)** — Apple Music for Home Assistant (MIT license). That server’s API traces back to **[itunes-api](https://github.com/jonmaddox/itunes-api)** by Jon Maddox, with further updates by chasut for the modern Music.app.
+
+Use **apple-music-custom** if you want the Home Assistant integration, launchd service install, and macOS push notifications (`notify.py` + SSE). Use **applemusicgo** for a single Go binary, Swagger docs, and catalog search/play without Node.js.
 
 ## Environment
 
