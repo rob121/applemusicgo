@@ -1,0 +1,1068 @@
+openapi: 3.0.3
+info:
+  title: applemusicgo API
+  description: |
+    HTTP API to control Apple Music on macOS via osascript (JXA / AppleScript).
+    Requires Music.app on the same machine. Default port 8181 (`PORT` env).
+  version: 1.0.0
+  contact:
+    name: applemusicgo
+servers:
+  - url: /
+    description: Same host and port as this page (use /swagger/ on the running server)
+
+tags:
+  - name: Health
+  - name: Player
+  - name: Library
+  - name: Music Search
+  - name: Playlists
+  - name: Artwork
+  - name: AirPlay
+  - name: Events
+
+paths:
+  /_ping:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: ping
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /now_playing:
+    get:
+      tags: [Player]
+      summary: Current player state
+      operationId: nowPlaying
+      responses:
+        "200":
+          description: Player state JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /play:
+    put:
+      tags: [Player]
+      summary: Play
+      operationId: play
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /pause:
+    put:
+      tags: [Player]
+      summary: Pause
+      operationId: pause
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /playpause:
+    put:
+      tags: [Player]
+      summary: Toggle play / pause
+      operationId: playPause
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /stop:
+    put:
+      tags: [Player]
+      summary: Stop
+      operationId: stop
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /next:
+    put:
+      tags: [Player]
+      summary: Next track
+      operationId: next
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /previous:
+    put:
+      tags: [Player]
+      summary: Previous track
+      operationId: previous
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /seek:
+    put:
+      tags: [Player]
+      summary: Seek to position (seconds)
+      operationId: seek
+      requestBody:
+        $ref: "#/components/requestBodies/FormPosition"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /volume:
+    put:
+      tags: [Player]
+      summary: Set volume
+      operationId: setVolume
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /mute:
+    put:
+      tags: [Player]
+      summary: Set mute
+      operationId: setMute
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [muted]
+              properties:
+                muted:
+                  type: string
+                  description: "true or false"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /shuffle:
+    put:
+      tags: [Player]
+      summary: Set shuffle mode
+      operationId: setShuffle
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  description: songs, albums, off, or false
+                  example: songs
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /repeat:
+    put:
+      tags: [Player]
+      summary: Set repeat mode
+      operationId: setRepeat
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  description: all, one, off, or false
+                  example: all
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /artwork:
+    get:
+      tags: [Artwork]
+      summary: Current track artwork (JPEG)
+      operationId: artworkNow
+      responses:
+        "200":
+          description: JPEG image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /events:
+    get:
+      tags: [Events]
+      summary: Server-Sent Events stream of player state
+      operationId: events
+      responses:
+        "200":
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /notify:
+    post:
+      tags: [Events]
+      summary: Push notification update (SSE broadcast)
+      description: Used by external tools (e.g. notify.py) to feed player updates into SSE clients.
+      operationId: notify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Notification"
+      responses:
+        "200":
+          description: Accepted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /playlists:
+    get:
+      tags: [Playlists]
+      summary: List user playlists
+      operationId: listPlaylists
+      responses:
+        "200":
+          description: Playlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  playlists:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Playlist"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /playlists/{id}/play:
+    put:
+      tags: [Playlists]
+      summary: Play a playlist by id or slugified name
+      operationId: playPlaylist
+      parameters:
+        - $ref: "#/components/parameters/PlaylistId"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/artists:
+    get:
+      tags: [Library]
+      summary: Browse artists
+      operationId: libraryArtists
+      parameters:
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/LimitArtists"
+      responses:
+        "200":
+          description: Paginated artists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistsPage"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/artists/{artist}/albums:
+    get:
+      tags: [Library]
+      summary: Albums by artist
+      operationId: libraryArtistAlbums
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+      responses:
+        "200":
+          description: Artist albums
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artist:
+                    type: string
+                  albums:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AlbumRef"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/artists/{artist}/tracks:
+    get:
+      tags: [Library]
+      summary: Tracks by artist
+      operationId: libraryArtistTracks
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+      responses:
+        "200":
+          description: Artist tracks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistTracks"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/artists/{artist}/play:
+    put:
+      tags: [Library]
+      summary: Play all tracks by artist
+      operationId: playArtist
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/albums:
+    get:
+      tags: [Library]
+      summary: Browse albums
+      operationId: libraryAlbums
+      parameters:
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/LimitAlbums"
+      responses:
+        "200":
+          description: Paginated albums
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumsPage"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/albums/{artist}/{album}/tracks:
+    get:
+      tags: [Library]
+      summary: Tracks in an album
+      operationId: libraryAlbumTracks
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+        - $ref: "#/components/parameters/Album"
+      responses:
+        "200":
+          description: Album tracks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumTracks"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/albums/{artist}/{album}/play:
+    put:
+      tags: [Library]
+      summary: Play an album
+      operationId: playAlbum
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+        - $ref: "#/components/parameters/Album"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/tracks/{id}/play:
+    put:
+      tags: [Library]
+      summary: Play track by id (library or catalog)
+      operationId: playTrack
+      description: |
+        Pass a single **id**; the server resolves the type automatically.
+
+        - **Library** — 16-character hex persistent ID (from your library or merged
+          `/music/search` hits with `source: library`).
+        - **Catalog** — numeric id from `/music/search` (`id` or `catalog_track_id` when
+          `source: catalog`). Metadata is fetched from the iTunes Lookup API; Music.app
+          plays via Apple Music subscription (no extra query parameters).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Library persistent ID (16-char hex) or catalog track id (digits)
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /library/search:
+    get:
+      tags: [Library]
+      summary: Search cached library (track title only)
+      operationId: librarySearch
+      parameters:
+        - $ref: "#/components/parameters/Query"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibrarySearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /music/search:
+    get:
+      tags: [Music Search]
+      summary: Search Apple Music catalog and library
+      description: |
+        Merges three sources: **iTunes Search API** (full Apple Music catalog),
+        **Music.app** `search` (library playlist via osascript), and cached local
+        library matches on name, artist, and album. Broader than `GET /library/search`,
+        which only filters cached track titles.
+      operationId: musicSearch
+      parameters:
+        - $ref: "#/components/parameters/Query"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: Max results (default 50, max 100)
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MusicSearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /airplay_devices:
+    get:
+      tags: [AirPlay]
+      summary: List AirPlay devices
+      operationId: airplayList
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  airplay_devices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AirPlayDevice"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /airplay_devices/{id}:
+    get:
+      tags: [AirPlay]
+      summary: Get one AirPlay device
+      operationId: airplayGet
+      parameters:
+        - $ref: "#/components/parameters/AirPlayId"
+      responses:
+        "200":
+          description: Device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AirPlayDevice"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /airplay_devices/{id}/on:
+    put:
+      tags: [AirPlay]
+      summary: Enable AirPlay device
+      operationId: airplayOn
+      parameters:
+        - $ref: "#/components/parameters/AirPlayId"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /airplay_devices/{id}/off:
+    put:
+      tags: [AirPlay]
+      summary: Disable AirPlay device
+      operationId: airplayOff
+      parameters:
+        - $ref: "#/components/parameters/AirPlayId"
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /airplay_devices/{id}/volume:
+    put:
+      tags: [AirPlay]
+      summary: Set AirPlay device volume
+      operationId: airplayVolume
+      parameters:
+        - $ref: "#/components/parameters/AirPlayId"
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level:
+                  type: integer
+      responses:
+        "200":
+          description: Updated player state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /artwork/{artist}/{album}:
+    get:
+      tags: [Artwork]
+      summary: Album artwork (JPEG)
+      operationId: artworkAlbum
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+        - $ref: "#/components/parameters/Album"
+      responses:
+        "200":
+          description: JPEG
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /artwork/artist/{artist}:
+    get:
+      tags: [Artwork]
+      summary: Artist artwork (JPEG)
+      operationId: artworkArtist
+      parameters:
+        - $ref: "#/components/parameters/Artist"
+      responses:
+        "200":
+          description: JPEG
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /artwork/playlist/{name}:
+    get:
+      tags: [Artwork]
+      summary: Playlist collage artwork (JPEG)
+      operationId: artworkPlaylist
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: JPEG
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /artwork-static/{file}:
+    get:
+      tags: [Artwork]
+      summary: Cached static artwork file
+      operationId: artworkStatic
+      parameters:
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /debug/artwork-slugs:
+    get:
+      tags: [Artwork]
+      summary: Debug playlist artwork slugs
+      operationId: debugArtworkSlugs
+      responses:
+        "200":
+          description: Slug debug info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    slug:
+                      type: string
+                    filename:
+                      type: string
+                    custom_found:
+                      type: boolean
+
+components:
+  parameters:
+    Query:
+      name: q
+      in: query
+      required: true
+      schema:
+        type: string
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+    LimitArtists:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 100
+    LimitAlbums:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+    Artist:
+      name: artist
+      in: path
+      required: true
+      schema:
+        type: string
+    Album:
+      name: album
+      in: path
+      required: true
+      schema:
+        type: string
+    PlaylistId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    AirPlayId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Device id (network address with colons as dashes, or name)
+
+  requestBodies:
+    FormPosition:
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            type: object
+            required: [position]
+            properties:
+              position:
+                type: number
+                format: float
+                description: Position in seconds
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Not found
+    InternalError:
+      description: Internal server error
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    PlayerState:
+      type: object
+      description: Current player state (fields vary when stopped)
+      properties:
+        player_state:
+          type: string
+          enum: [playing, paused, stopped]
+        id:
+          type: string
+        name:
+          type: string
+        artist:
+          type: string
+        album:
+          type: string
+        volume:
+          type: integer
+        muted:
+          type: boolean
+        repeat:
+          type: string
+        shuffle:
+          type: boolean
+        player_position:
+          type: number
+        player_duration:
+          type: number
+        position_timestamp:
+          type: integer
+          format: int64
+        playlist:
+          type: string
+
+    Notification:
+      type: object
+      properties:
+        player_state:
+          type: string
+        persistent_id:
+          type: string
+        name:
+          type: string
+        artist:
+          type: string
+        album:
+          type: string
+        total_time:
+          type: number
+          description: Duration in milliseconds
+
+    Playlist:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    AlbumRef:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    TrackRef:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        artist:
+          type: string
+        album:
+          type: string
+        track_number:
+          type: integer
+        disc_number:
+          type: integer
+        duration:
+          type: number
+
+    ArtistsPage:
+      type: object
+      properties:
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        artists:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+
+    AlbumsPage:
+      type: object
+      properties:
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        albums:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              artist:
+                type: string
+
+    ArtistTracks:
+      type: object
+      properties:
+        artist:
+          type: string
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackRef"
+
+    AlbumTracks:
+      type: object
+      properties:
+        artist:
+          type: string
+        album:
+          type: string
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackRef"
+
+    LibrarySearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        tracks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              artist:
+                type: string
+              album:
+                type: string
+
+    MusicSearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        tracks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              database_id:
+                type: integer
+              name:
+                type: string
+              artist:
+                type: string
+              album:
+                type: string
+              kind:
+                type: string
+              catalog_track_id:
+                type: integer
+                description: iTunes / Apple Music catalog track id
+              track_view_url:
+                type: string
+              source:
+                type: string
+                enum: [catalog, music, library]
+                description: catalog = iTunes Search API; music = Music.app search; library = local cache
+
+    AirPlayDevice:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        active:
+          type: boolean
+        selected:
+          type: boolean
+        sound_volume:
+          type: integer
+        supports_video:
+          type: boolean
+        supports_audio:
+          type: boolean
+        network_address:
+          type: string
