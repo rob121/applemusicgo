@@ -390,6 +390,33 @@
 
     .volume-row svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
 
+    .power-row {
+      display: flex;
+      justify-content: center;
+      margin-top: 4px;
+      padding-top: 16px;
+      border-top: 1px solid var(--separator);
+    }
+
+    .power-btn {
+      width: auto;
+      min-width: var(--touch);
+      min-height: var(--touch);
+      border-radius: 999px;
+      padding: 0 16px;
+      gap: 8px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--label-secondary);
+      font: inherit;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .power-btn:hover { color: var(--label); }
+    .power-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .power-btn svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+
     #volume {
       flex: 1;
       -webkit-appearance: none;
@@ -509,6 +536,12 @@
         <div class="volume-row">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
           <input type="range" id="volume" min="0" max="100" value="50" aria-label="Volume" />
+        </div>
+        <div class="power-row">
+          <button class="ctrl power-btn" id="btn-power" type="button" aria-label="Restart Apple Music">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3h-2v10h2V3zm-1 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"/></svg>
+            <span>Restart Music</span>
+          </button>
         </div>
       </aside>
     </main>
@@ -749,6 +782,23 @@
     });
     $("#btn-prev").addEventListener("click", () => transport("/previous"));
     $("#btn-next").addEventListener("click", () => transport("/next"));
+
+    $("#btn-power").addEventListener("click", async () => {
+      if (!confirm("Restart Apple Music? Playback will stop briefly.")) return;
+      const btn = $("#btn-power");
+      btn.disabled = true;
+      toast("Restarting Apple Music…");
+      try {
+        const r = await api("/power", { method: "PUT" });
+        if (!r.ok) throw new Error();
+        applyState(await r.json());
+        toast("Apple Music restarted");
+      } catch (_) {
+        toast("Could not restart Apple Music");
+      } finally {
+        btn.disabled = false;
+      }
+    });
 
     $("#progress").addEventListener("pointerdown", () => { progressDragging = true; });
     $("#progress").addEventListener("pointerup", async (e) => {

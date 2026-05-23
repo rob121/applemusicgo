@@ -172,7 +172,7 @@ else {
 	if strings.TrimSpace(out) != "1" {
 		return false, nil
 	}
-	return waitForPlayback(8 * time.Second), nil
+	return ensureCatalogPlayback(10 * time.Second), nil
 }
 
 func catalogSearchQueries(trackName, artist string) []string {

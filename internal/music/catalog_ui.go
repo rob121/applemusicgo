@@ -1,6 +1,7 @@
 package music
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -36,28 +37,47 @@ func collectionIDFromTrackURL(trackViewURL string) int64 {
 
 // clickMusicUIButton clicks a Music.app control by accessibility description (requires Accessibility permission).
 func clickMusicUIButton(description string) (bool, error) {
+	return clickMusicUIButtonAny(description)
+}
+
+func clickMusicUIButtonAny(descriptions ...string) (bool, error) {
+	if len(descriptions) == 0 {
+		return false, nil
+	}
+	descJSON, err := json.Marshal(descriptions)
+	if err != nil {
+		return false, err
+	}
 	script := fmt.Sprintf(`
 var se = Application("System Events");
 var proc = se.processes.byName("Music");
 proc.frontmost = true;
 delay(0.3);
 var w = proc.windows[0];
-function find(el, desc) {
+var descs = %s;
+function matches(desc) {
+  desc = String(desc || "").toLowerCase();
+  for (var i = 0; i < descs.length; i++) {
+    if (desc === String(descs[i]).toLowerCase()) return true;
+  }
+  return false;
+}
+function find(el) {
   try {
-    if (el.role() === "AXButton" && el.description() === desc) return el;
+    if (el.role() === "AXButton" && matches(el.description())) return el;
   } catch(e) {}
   try {
     var kids = el.uiElements();
     for (var i = 0; i < kids.length; i++) {
-      var f = find(kids[i], desc);
+      var f = find(kids[i]);
       if (f) return f;
     }
   } catch(e) {}
   return null;
 }
-var btn = find(w, %q);
+var btn = find(w);
 if (!btn) { "0"; } else { btn.click(); "1"; }
-`, description)
+`, string(descJSON))
 	out, err := RunJXA(script)
 	if err != nil {
 		if strings.Contains(err.Error(), "1002") || strings.Contains(err.Error(), "not allowed") {
@@ -69,6 +89,10 @@ if (!btn) { "0"; } else { btn.click(); "1"; }
 }
 
 func clickMusicTrackRow(trackName string) (bool, error) {
+	return selectMusicTrackRow(trackName)
+}
+
+func selectMusicTrackRow(trackName string) (bool, error) {
 	needle := normalizeTrackTitle(trackName)
 	if needle == "" {
 		return false, nil
@@ -76,6 +100,8 @@ func clickMusicTrackRow(trackName string) (bool, error) {
 	script := fmt.Sprintf(`
 var se = Application("System Events");
 var proc = se.processes.byName("Music");
+proc.frontmost = true;
+delay(0.15);
 var w = proc.windows[0];
 var needle = %q;
 function walk(el) {
@@ -101,6 +127,104 @@ walk(w) ? "1" : "0";
 		return false, err
 	}
 	return strings.TrimSpace(out) == "1", nil
+}
+
+func doubleClickMusicTrackRow(trackName string) (bool, error) {
+	needle := normalizeTrackTitle(trackName)
+	if needle == "" {
+		return false, nil
+	}
+	script := fmt.Sprintf(`
+var se = Application("System Events");
+var proc = se.processes.byName("Music");
+proc.frontmost = true;
+delay(0.15);
+var w = proc.windows[0];
+var needle = %q;
+function pressTwice(el) {
+  el.performAction("AXPress");
+  delay(0.08);
+  el.performAction("AXPress");
+}
+function walk(el) {
+  try {
+    var v = el.value();
+    if (v && String(v).toLowerCase().indexOf(needle) >= 0) {
+      pressTwice(el);
+      return true;
+    }
+  } catch(e) {}
+  try {
+    var kids = el.uiElements();
+    for (var i = 0; i < kids.length; i++) {
+      if (walk(kids[i])) return true;
+    }
+  } catch(e) {}
+  return false;
+}
+walk(w) ? "1" : "0";
+`, needle)
+	out, err := RunJXA(script)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) == "1", nil
+}
+
+func pressMusicKey(keyCode int) (bool, error) {
+	script := fmt.Sprintf(`
+var se = Application("System Events");
+var proc = se.processes.byName("Music");
+proc.frontmost = true;
+delay(0.15);
+se.keyCode(%d);
+"1";
+`, keyCode)
+	out, err := RunJXA(script)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) == "1", nil
+}
+
+func playerIsActive() bool {
+	state, err := GetCurrentState()
+	if err != nil {
+		return false
+	}
+	ps, _ := state["player_state"].(string)
+	return ps == "playing" || ps == "paused"
+}
+
+// ensureCatalogPlayback tries several ways to start playback after a track is selected in Music.app.
+func ensureCatalogPlayback(timeout time.Duration) bool {
+	if playerIsActive() {
+		return true
+	}
+	deadline := time.Now().Add(timeout)
+	step := 0
+	for time.Now().Before(deadline) {
+		if playerIsActive() {
+			return true
+		}
+		switch step % 6 {
+		case 0:
+			_, _ = RunAppleScript(`tell application "Music" to play`)
+		case 1:
+			_, _ = pressMusicKey(36) // Return — plays selected track in album lists
+		case 2:
+			_, _ = clickMusicUIButtonAny("Play", "play", "Resume")
+		case 3:
+			_, _ = pressMusicKey(49) // Space
+		case 4:
+			_, _ = RunAppleScript(`tell application "iTunes" to play`)
+		case 5:
+			_, _ = clickMusicUIButtonAny("Play", "play")
+		}
+		step++
+		sleepMs(700)
+	}
+	return playerIsActive()
 }
 
 func openCatalogInMusic(itmsURL string) error {
@@ -137,7 +261,9 @@ func playCatalogViaStoreSearch(meta *ITunesTrackMeta) (bool, error) {
 	}
 	sleepMs(6000)
 	if ok, _ := clickMusicSearchResultPlay(meta.TrackName, meta.ArtistName); ok {
-		return waitForPlayback(10 * time.Second), nil
+		if ensureCatalogPlayback(10 * time.Second) {
+			return true, nil
+		}
 	}
 	return false, nil
 }
@@ -151,28 +277,35 @@ func playCatalogViaITMSPage(meta *ITunesTrackMeta) (bool, error) {
 	if err := openCatalogInMusic(itms); err != nil {
 		return false, err
 	}
-	sleepMs(8000)
-	if meta.TrackNumber > 0 {
-		_, _ = doubleClickAlbumTrackByNumber(meta.TrackNumber)
-		sleepMs(1200)
-		if waitForPlayback(8 * time.Second) {
-			return true, nil
-		}
+	sleepMs(5000)
+
+	// ?i= in the URL often selects the track; try starting playback before clicking the row.
+	if ensureCatalogPlayback(8 * time.Second) {
+		return true, nil
 	}
-	_, _ = clickMusicTrackRow(meta.TrackName)
-	sleepMs(800)
-	if musicUIAutomationAvailable() {
-		if ok, _ := clickMusicUIButton("play"); ok {
-			if waitForPlayback(10 * time.Second) {
+
+	if meta.TrackNumber > 0 {
+		if ok, _ := doubleClickAlbumTrackByNumber(meta.TrackNumber); ok {
+			if ensureCatalogPlayback(10 * time.Second) {
 				return true, nil
 			}
 		}
 	}
-	// Global play as fallback (Music menu bar transport).
-	if _, err := RunAppleScript(`tell application "Music" to play`); err != nil {
-		_, _ = RunAppleScript(`tell application "iTunes" to play`)
+
+	if ok, _ := doubleClickMusicTrackRow(meta.TrackName); ok {
+		if ensureCatalogPlayback(10 * time.Second) {
+			return true, nil
+		}
 	}
-	return waitForPlayback(8 * time.Second), nil
+
+	// Single click only selects (highlights) the row — follow with explicit play attempts.
+	if ok, _ := selectMusicTrackRow(meta.TrackName); ok {
+		if ensureCatalogPlayback(12 * time.Second) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func playCatalogViaAddToLibrary(meta *ITunesTrackMeta) (bool, error) {
@@ -185,6 +318,9 @@ func playCatalogViaAddToLibrary(meta *ITunesTrackMeta) (bool, error) {
 	}
 	sleepMs(6000)
 	if ok, _ := clickMusicUIButton("Add to Library"); !ok {
+		if ensureCatalogPlayback(12 * time.Second) {
+			return true, nil
+		}
 		return false, nil
 	}
 	if id, ok := waitForLibraryTrack(meta.TrackName, meta.ArtistName, 30*time.Second); ok {
@@ -291,7 +427,10 @@ var artistNeedle = %q;
 function findPlayIn(el, depth) {
   if (depth > 8) return null;
   try {
-    if (el.role() === "AXButton" && el.description() === "play") return el;
+    if (el.role() === "AXButton") {
+      var d = String(el.description() || "").toLowerCase();
+      if (d === "play") return el;
+    }
   } catch(e) {}
   try {
     var kids = el.uiElements();
@@ -345,28 +484,63 @@ func doubleClickAlbumTrackByNumber(trackNumber int) (bool, error) {
 	}
 	script := fmt.Sprintf(`
 var se = Application("System Events");
-var w = se.processes.byName("Music").windows[0];
-var idx = %d;
-var groups = [];
-function collectGroups(el, depth) {
-  if (depth > 14) return;
+var proc = se.processes.byName("Music");
+proc.frontmost = true;
+delay(0.2);
+var w = proc.windows[0];
+var numStr = %q;
+function firstValue(el) {
   try {
-    if (el.role() === "AXGroup" || el.role() === "group") groups.push(el);
+    var v = el.value();
+    if (v) return String(v).trim();
+  } catch(e) {}
+  return "";
+}
+function rowLead(el) {
+  try {
+    var kids = el.uiElements();
+    if (kids.length === 0) return "";
+    return firstValue(kids[0]);
+  } catch(e) { return ""; }
+}
+function pressTwice(el) {
+  el.performAction("AXPress");
+  delay(0.08);
+  el.performAction("AXPress");
+}
+function rowMatches(el) {
+  var lead = rowLead(el);
+  if (lead === numStr) return true;
+  try {
+    var parts = [];
+    var kids = el.uiElements();
+    for (var i = 0; i < Math.min(kids.length, 4); i++) parts.push(firstValue(kids[i]));
+    var text = parts.join(" ");
+    if (text.indexOf(numStr + " ") === 0) return true;
+  } catch(e) {}
+  return false;
+}
+function walk(el, depth) {
+  if (depth > 18) return false;
+  try {
+    var role = el.role();
+    if (role === "AXRow" || role === "AXGroup" || role === "group" || role === "row") {
+      if (rowMatches(el)) {
+        pressTwice(el);
+        return true;
+      }
+    }
   } catch(e) {}
   try {
     var kids = el.uiElements();
-    for (var i = 0; i < kids.length; i++) collectGroups(kids[i], depth + 1);
+    for (var i = 0; i < kids.length; i++) {
+      if (walk(kids[i], depth + 1)) return true;
+    }
   } catch(e) {}
+  return false;
 }
-collectGroups(w, 0);
-if (groups.length >= idx) {
-  try {
-    groups[idx - 1].performAction("AXPress");
-    groups[idx - 1].performAction("AXPress");
-    "1";
-  } catch (e) { "0"; }
-} else { "0"; }
-`, trackNumber)
+walk(w, 0) ? "1" : "0";
+`, strconv.Itoa(trackNumber))
 	out, err := RunJXA(script)
 	if err != nil {
 		return false, err
