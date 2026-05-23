@@ -82,6 +82,17 @@ First catalog play can take **~30 seconds** while Music.app loads the album page
 
 Other commands: `pause`, `playpause`, `stop`, `previous`, `next`, `mute`, `shuffle`, `repeat`, `seek`.
 
+## Install as a service (launchd)
+
+To run at login on a Mac (local or remote via SSH), see **[install/README.md](install/README.md)**.
+
+```bash
+chmod +x install/*.sh
+./install/install-remote.sh user@your-mac
+```
+
+This cross-compiles, copies the binary and plist, and registers a `LaunchAgent` at `~/Library/LaunchAgents/com.rob121.applemusicgo.plist`.
+
 ## Apple Music error 3048
 
 If Music shows **“There was a problem downloading … (3048)”** when playing a track, that usually means a **purchased/cloud track** could not be downloaded (authorization or network). Single-track library play uses direct playback (no temp playlist) to avoid forcing a download. If it persists: **Music → Account → Authorizations → Authorize This Computer**, sign in with the Apple ID used for the purchase, then retry.
@@ -92,6 +103,7 @@ If Music shows **“There was a problem downloading … (3048)”** when playing
 - `internal/music` — osascript / JXA integration (player, library, search, catalog play, artwork)
 - `internal/server` — HTTP API and Swagger UI
 - `api/` — embedded OpenAPI spec
+- `install/` — launchd plist template and install/deploy scripts
 - `lib/` — reference AppleScript only (not used at runtime; see `lib/README.md`)
 
 ## Credits
