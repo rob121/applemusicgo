@@ -70,6 +70,20 @@ curl -X PUT http://localhost:8181/library/tracks/8359A9EB1A4FC305/play
 
 First catalog play can take **~30 seconds** while Music.app loads the album page and adds the track. Subsequent plays are fast if the track is already in your library. On failure, the API returns **404** with a JSON body explaining likely causes (Accessibility, Apple Music sign-in).
 
+### Now-playing artwork
+
+While a track is **playing or paused**, fetch the current cover as JPEG:
+
+```bash
+curl -o cover.jpg http://localhost:8181/artwork/now.jpg
+# or
+curl -o cover.jpg http://localhost:8181/artwork
+```
+
+Any `/artwork/{name}.jpg` path returns now-playing art (`/artwork/cover.jpg`, etc.) — useful for clients that require a `.jpg` URL. Album art by library metadata remains at `/artwork/{artist}/{album}` (two path segments).
+
+Each request pulls art from Music.app and updates `{data-dir}/artwork-cache/now-playing.jpg`. `GET /now_playing` includes `"artwork_url": "/artwork/now.jpg"` when a track is active.
+
 ## CLI
 
 ```bash

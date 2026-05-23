@@ -265,6 +265,7 @@ paths:
     get:
       tags: [Artwork]
       summary: Current track artwork (JPEG)
+      description: Fetches artwork from Music.app for the current track. Same image as `/artwork/now.jpg`.
       operationId: artworkNow
       responses:
         "200":
@@ -274,8 +275,38 @@ paths:
               schema:
                 type: string
                 format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+
+  /artwork/{filename}:
+    get:
+      tags: [Artwork]
+      summary: Now-playing artwork by filename (.jpg alias)
+      description: |
+        Any single-segment path ending in `.jpg`, `.jpeg`, or `.png` returns the
+        **current track** artwork — e.g. `/artwork/now.jpg`, `/artwork/cover.jpg`.
+        Useful for media players that require a fixed `.jpg` URL. Does not apply
+        to `/artwork/{artist}/{album}` (two path segments).
+      operationId: artworkNowFilename
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            example: now.jpg
+      responses:
+        "200":
+          description: JPEG image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /events:
     get:

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -98,6 +99,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /artwork-static/{file}", s.handleArtworkStatic)
 	mux.HandleFunc("GET /artwork/playlist/{name}", s.handleArtworkPlaylist)
 	mux.HandleFunc("GET /artwork/artist/{artist}", s.handleArtworkArtist)
+	mux.HandleFunc("GET /artwork/{filename}", s.handleArtworkFilename)
 	mux.HandleFunc("GET /artwork/{artist}/{album}", s.handleArtworkAlbum)
 	mux.HandleFunc("GET /debug/artwork-slugs", s.handleDebugArtworkSlugs)
 	mux.HandleFunc("GET /playlists", s.handlePlaylists)
@@ -139,7 +141,7 @@ func (s *Server) sendResponse(w http.ResponseWriter, err error) {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, state)
+	writeJSON(w, music.EnrichPlayerState(state))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -285,13 +287,25 @@ func (s *Server) handleNotify(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleArtworkNow(w http.ResponseWriter, r *http.Request) {
-	if err := music.FetchNowPlayingArtwork(); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+	path, err := music.FetchNowPlayingArtwork(s.BaseDir)
+	if err != nil {
+		http.Error(w, "", http.StatusNotFound)
 		return
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, music.NowPlayingArtworkPath())
+	http.ServeFile(w, r, path)
+}
+
+// handleArtworkFilename serves now-playing art for any /artwork/{name}.jpg URL
+// (e.g. /artwork/now.jpg) for clients that require a .jpg path.
+func (s *Server) handleArtworkFilename(w http.ResponseWriter, r *http.Request) {
+	filename := r.PathValue("filename")
+	if !music.IsNowPlayingArtworkFilename(filename) {
+		http.Error(w, "", http.StatusNotFound)
+		return
+	}
+	s.handleArtworkNow(w, r)
 }
 
 func cacheHeaders(next http.Handler) http.Handler {
@@ -421,18 +435,41 @@ func (s *Server) handleDebugArtworkSlugs(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
-	var result []map[string]any
+	var playlistSlugs []map[string]any
 	for _, p := range playlists {
 		slug := music.Slugify(p.Name)
 		custom := music.CustomArtworkPath(s.BaseDir, p.Name) != ""
-		result = append(result, map[string]any{
+		playlistSlugs = append(playlistSlugs, map[string]any{
 			"name":         p.Name,
 			"slug":         slug,
 			"filename":     slug + ".jpg",
 			"custom_found": custom,
 		})
 	}
-	writeJSON(w, result)
+	out := map[string]any{
+		"note": "For custom playlist images only. Put files in custom-artwork/ using slug.jpg. For the current track use GET /artwork or GET /artwork/{artist}/{album}.",
+		"custom_artwork_dir": music.CustomArtworkDir(s.BaseDir),
+		"playlists":          playlistSlugs,
+	}
+	if state, err := music.GetCurrentState(); err == nil {
+		if ps, _ := state["player_state"].(string); ps == "playing" || ps == "paused" {
+			artist, _ := state["artist"].(string)
+			album, _ := state["album"].(string)
+			albumBase := music.StripAlbumYearSuffix(album)
+			out["now_playing"] = map[string]any{
+				"name":         state["name"],
+				"artist":       artist,
+				"album":        album,
+				"artwork_url":  "/artwork/now.jpg",
+				"artwork_urls": map[string]string{
+					"now":   "/artwork/now.jpg",
+					"plain": "/artwork",
+					"album": "/artwork/" + url.PathEscape(artist) + "/" + url.PathEscape(albumBase),
+				},
+			}
+		}
+	}
+	writeJSON(w, out)
 }
 
 func (s *Server) handlePlaylists(w http.ResponseWriter, r *http.Request) {

@@ -42,32 +42,91 @@ func ArtworkFilePath(base, artist, album string) string {
 	return filepath.Join(ArtworkDir(base), Slugify(artist+"||"+album)+".jpg")
 }
 
-const nowPlayingArtScript = `set outPath to "/tmp/currently-playing.jpg"
-try
-	tell application "Music"
-		if player state is not stopped then
-			set artData to raw data of artwork 1 of current track
-			set f to open for access POSIX file outPath with write permission
-			set eof of f to 0
-			write artData to f
-			close access f
-		end if
-	end tell
-on error
-	try
-		tell application "iTunes"
-			if player state is not stopped then
-				set artData to raw data of artwork 1 of current track
-				set f to open for access POSIX file outPath with write permission
-				set eof of f to 0
-				write artData to f
-				close access f
-			end if
-		end tell
-	end try
-end try`
+const nowPlayingArtScriptTmpl = `set outPath to %q
+tell application %q
+	if player state is not stopped then
+		set artData to raw data of artwork 1 of current track
+		set f to open for access POSIX file outPath with write permission
+		set eof of f to 0
+		write artData to f
+		close access f
+	end if
+end tell`
+
+// NowPlayingArtworkPath returns the cached JPEG path for the current track.
+func NowPlayingArtworkPath(base string) string {
+	if base != "" {
+		return filepath.Join(ArtworkDir(base), "now-playing.jpg")
+	}
+	return filepath.Join(os.TempDir(), "currently-playing.jpg")
+}
+
+// FetchNowPlayingArtwork extracts artwork from Music.app's current track into artwork-cache.
+func FetchNowPlayingArtwork(base string) (string, error) {
+	if base != "" {
+		EnsureArtworkDirs(base)
+	}
+	outPath := NowPlayingArtworkPath(base)
+	for _, app := range []string{"Music", "iTunes"} {
+		script := fmt.Sprintf(nowPlayingArtScriptTmpl, outPath, app)
+		if _, err := RunAppleScript(script); err != nil {
+			continue
+		}
+		if _, err := os.Stat(outPath); err == nil {
+			return outPath, nil
+		}
+	}
+	return "", fmt.Errorf("no artwork")
+}
+
+// EnrichPlayerState adds artwork_url when a track is active.
+func EnrichPlayerState(state PlayerState) PlayerState {
+	if state == nil {
+		return state
+	}
+	ps, _ := state["player_state"].(string)
+	if ps == "playing" || ps == "paused" {
+		state["artwork_url"] = "/artwork/now.jpg"
+	}
+	return state
+}
+
+// IsNowPlayingArtworkFilename reports whether path is /artwork/{name}.jpg style now-playing alias.
+func IsNowPlayingArtworkFilename(filename string) bool {
+	filename = strings.ToLower(strings.TrimSpace(filename))
+	return strings.HasSuffix(filename, ".jpg") ||
+		strings.HasSuffix(filename, ".jpeg") ||
+		strings.HasSuffix(filename, ".png")
+}
 
 func FetchAndSaveArtwork(base, artist, album string) (string, error) {
+	albums := []string{album}
+	if stripped := StripAlbumYearSuffix(album); stripped != album {
+		albums = append(albums, stripped)
+	}
+	var lastErr error
+	for _, albumName := range albums {
+		dest, err := fetchLibraryAlbumArtwork(base, artist, albumName)
+		if err == nil {
+			return dest, nil
+		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", fmt.Errorf("no artwork")
+}
+
+func StripAlbumYearSuffix(album string) string {
+	album = strings.TrimSpace(album)
+	if i := strings.LastIndex(album, " ("); i > 0 && strings.HasSuffix(album, ")") {
+		return strings.TrimSpace(album[:i])
+	}
+	return album
+}
+
+func fetchLibraryAlbumArtwork(base, artist, album string) (string, error) {
 	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("album-art-%d.jpg", time.Now().UnixNano()))
 	script := fmt.Sprintf(`set targetArtist to %q
 set targetAlbum to %q
@@ -117,15 +176,6 @@ return "fail"`, artist, album, tmpFile)
 		return "", err
 	}
 	return dest, nil
-}
-
-func FetchNowPlayingArtwork() error {
-	_, err := RunAppleScript(nowPlayingArtScript)
-	return err
-}
-
-func NowPlayingArtworkPath() string {
-	return "/tmp/currently-playing.jpg"
 }
 
 func BuildCollageFromCovers(covers []string, cacheFile string) error {
