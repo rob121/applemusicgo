@@ -76,7 +76,15 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
+// Flush forwards to the underlying ResponseWriter when it supports streaming.
+func (rw *responseWriter) Flush() {
+	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func (s *Server) registerRoutes(mux *http.ServeMux) {
+	registerWebRoutes(mux)
 	registerSwaggerRoutes(mux)
 	mux.HandleFunc("GET /_ping", s.handlePing)
 	mux.HandleFunc("GET /events", s.handleEvents)
@@ -85,6 +93,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /pause", s.handlePause)
 	mux.HandleFunc("PUT /playpause", s.handlePlayPause)
 	mux.HandleFunc("PUT /stop", s.handleStop)
+	mux.HandleFunc("PUT /power", s.handlePower)
 	mux.HandleFunc("PUT /previous", s.handlePrevious)
 	mux.HandleFunc("PUT /next", s.handleNext)
 	mux.HandleFunc("PUT /volume", s.handleVolume)
@@ -171,6 +180,15 @@ func (s *Server) handlePlayPause(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.sendResponse(w, music.Stop())
+}
+
+func (s *Server) handlePower(w http.ResponseWriter, r *http.Request) {
+	if err := music.RestartMusicApp(); err != nil {
+		log.Printf("restart music: %v", err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	s.sendResponse(w, nil)
 }
 
 func (s *Server) handlePrevious(w http.ResponseWriter, r *http.Request) {

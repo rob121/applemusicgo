@@ -27,6 +27,7 @@ type MusicSearchTrack struct {
 	Kind           string `json:"kind,omitempty"`
 	Source         string `json:"source"`
 	TrackViewURL   string `json:"track_view_url,omitempty"`
+	ArtworkURL     string `json:"artwork_url,omitempty"`
 }
 
 // MusicSearchResponse is returned by GET /music/search.
@@ -72,14 +73,15 @@ type itunesSearchResponse struct {
 }
 
 type itunesSearchHit struct {
-	TrackID      int64  `json:"trackId"`
-	TrackName    string `json:"trackName"`
-	ArtistName   string `json:"artistName"`
-	CollectionID int64  `json:"collectionId"`
-	Collection   string `json:"collectionName"`
-	TrackNumber  int    `json:"trackNumber"`
-	TrackViewURL string `json:"trackViewUrl"`
-	Kind         string `json:"kind"`
+	TrackID       int64  `json:"trackId"`
+	TrackName     string `json:"trackName"`
+	ArtistName    string `json:"artistName"`
+	CollectionID  int64  `json:"collectionId"`
+	Collection    string `json:"collectionName"`
+	TrackNumber   int    `json:"trackNumber"`
+	TrackViewURL  string `json:"trackViewUrl"`
+	ArtworkURL100 string `json:"artworkUrl100"`
+	Kind          string `json:"kind"`
 }
 
 func searchITunesCatalog(query string, limit int) ([]MusicSearchTrack, error) {
@@ -114,6 +116,7 @@ func searchITunesCatalog(query string, limit int) ([]MusicSearchTrack, error) {
 			Kind:           "song",
 			Source:         "catalog",
 			TrackViewURL:   r.TrackViewURL,
+			ArtworkURL:     strings.Replace(r.ArtworkURL100, "100x100bb", "200x200bb", 1),
 		})
 	}
 	return tracks, nil

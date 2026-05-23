@@ -111,6 +111,22 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /power:
+    put:
+      tags: [Player]
+      summary: Restart Music.app
+      description: Quits Music.app (or iTunes), waits for exit, and relaunches it. Clears the library cache.
+      operationId: power
+      responses:
+        "200":
+          description: Updated player state after restart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerState"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /next:
     put:
       tags: [Player]

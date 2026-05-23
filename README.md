@@ -27,6 +27,8 @@ PORT=8181 ./applemusicgo serve --dir .
 
 Default port is **8181** (`PORT` env or `--port`).
 
+**Web player:** [http://localhost:8181/](http://localhost:8181/) — search, play, and now-playing controls with album art.
+
 **API docs:** [http://localhost:8181/swagger/](http://localhost:8181/swagger/) (alias `/docs`). OpenAPI spec at `/openapi.yaml`. Use the running server URL — do not open `swagger-ui.html` as a `file://` page.
 
 ### Endpoints
@@ -34,7 +36,7 @@ Default port is **8181** (`PORT` env or `--port`).
 | Area | Examples |
 |------|------------|
 | Health | `GET /_ping` |
-| Player | `PUT /play`, `/pause`, `/stop`, `/next`, `/volume`, `/seek`, … · `GET /now_playing` |
+| Player | `PUT /play`, `/pause`, `/stop`, `/power`, `/next`, `/volume`, `/seek`, … · `GET /now_playing` |
 | Library | `GET /library/artists`, `/library/albums`, `/library/search` · `PUT /library/tracks/{id}/play` |
 | Catalog search | `GET /music/search?q=…&limit=50` |
 | Playlists | `GET /playlists` · `PUT /playlists/{id}/play` |
